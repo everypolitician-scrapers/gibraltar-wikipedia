@@ -31,7 +31,11 @@ for x in current_parliament:
         party_dict[party_initialism] = party
     name = links[0]['title'].split(' (')[0]
     sort_name = links[0].text
+    family_name, given_name = sort_name.split(', ')
     if name == "Albert Isola":
+        # Albert Isola was elected at a by-election on 4 July 2013 after
+        # a seat had become vacant following the death of
+        # Bruzon, Charles Arthur in April 2013.
         start_date = "2013-07-04"
     wikipedia_url = None
     if 'new' not in links[0].get('class', []):
@@ -43,8 +47,29 @@ for x in current_parliament:
         "term": term,
         "start_date": start_date,
         "end_date": end_date,
+        "given_name": given_name,
+        "family_name": family_name,
         "sort_name": sort_name,
         "wikipedia": wikipedia_url,
     })
+
+# hardcode data about this deceased politician
+sort_name = "Bruzon, Charles Arthur"
+family_name, given_name = sort_name.split(', ')
+death_date = "2013-04-16"
+data.append({
+    "name": "Charles Bruzon",
+    "area": None,
+    "group": "Gibraltar Socialist Labour Party",
+    "term": term,
+    "start_date": "",
+    "end_date": death_date,
+    "death_date": death_date,
+    "given_name": given_name,
+    "family_name": family_name,
+    "sort_name": sort_name,
+    "wikipedia": "https://en.wikipedia.org/wiki/Charles_Bruzon",
+})
+
 
 scraperwiki.sqlite.save(["name", "term"], data, "data")
