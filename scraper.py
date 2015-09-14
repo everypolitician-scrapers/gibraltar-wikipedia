@@ -47,4 +47,4 @@ for x in current_parliament:
         "wikipedia": wikipedia_url,
     })
 
-scraperwiki.sqlite.save(["name", "term"], data_list, "data")
+scraperwiki.sqlite.save(["name", "term"], data, "data")
