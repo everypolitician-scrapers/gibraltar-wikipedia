@@ -10,6 +10,7 @@ import scraperwiki
 base_url = "https://en.wikipedia.org"
 cat_url = "{}/wiki/Category:Elections_in_Gibraltar".format(base_url)
 party_dict = {}
+sorted_name_re = re.compile(r"^([A-Z]+), (.*)$")
 
 def get_wiki(wiki_link):
     if wiki_link and 'new' not in wiki_link.get('class', []):
@@ -40,6 +41,13 @@ def scrape_table(table_soup):
             break
         p = cells[mapping["name"]]
         name = p.text
+        m = sorted_name_re.match(name)
+        if m:
+            family_name, given_name = m.groups()
+            sorted_name = name
+            name = "{} {}".format(given_name, family_name)
+        else:
+            family_name, given_name, sorted_name = None, None, None
         wiki_url, wiki_name = get_wiki(p.a)
         party_short = cells[mapping["party"]].text
         if cells[mapping["party"]].a:
@@ -49,6 +57,9 @@ def scrape_table(table_soup):
             party = party_dict.get(party_short, party_short)
         data.append({
             "name": name,
+            "family_name": family_name,
+            "given_name": given_name,
+            "sorted_name": sorted_name,
             "group": party,
             "wikipedia": wiki_url,
             "wikipedia_name": wiki_name,
