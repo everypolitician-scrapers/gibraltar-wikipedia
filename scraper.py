@@ -1,78 +1,119 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
 import re
+import time
 
 import bs4
 import scraperwiki
 
 
 base_url = "https://en.wikipedia.org"
-scrape_url = "{}/wiki/Next_Gibraltar_general_election".format(base_url)
+cat_url = "{}/wiki/Category:Elections_in_Gibraltar".format(base_url)
+party_dict = {}
 
-party_re = re.compile(r".*? \((.*)\)")
-term = 12
+def get_wiki(wiki_link):
+    if wiki_link and 'new' not in wiki_link.get('class', []):
+        wiki_url = '{}{}'.format(base_url, wiki_link['href'])
+        wiki_name = wiki_link['title']
+    else:
+        wiki_url = None
+        wiki_name = None
+    return wiki_url, wiki_name
 
-r = scraperwiki.scrape(scrape_url)
+def scrape_table(table_soup):
+    data = []
+    cols = {
+        "party": 0,
+        "Name of candidate": 1,
+    }
+    mapping = {}
+    header = table_soup.tr.find_all('td')
+    for idx, x in enumerate(header):
+        if "party" in x.text.lower():
+            mapping["party"] = idx
+        if "name" in x.text.lower():
+            mapping["name"] = idx
+    politicians = table_soup.find_all('tr')[1:]
+    for politician in politicians:
+        cells = politician.find_all('td')
+        if len(cells) == 1:
+            break
+        p = cells[mapping["name"]]
+        name = p.text
+        wiki_url, wiki_name = get_wiki(p.a)
+        party_short = cells[mapping["party"]].text
+        if cells[mapping["party"]].a:
+            party = cells[mapping["party"]].a['title']
+            party_dict[party_short] = party
+        else:
+            party = party_dict.get(party_short, party_short)
+        data.append({
+            "name": name,
+            "group": party,
+            "wikipedia": wiki_url,
+            "wikipedia_name": wiki_name,
+        })
+    scraperwiki.sqlite.save(["name"], data, "data")
+
+def scrape_latest(soup):
+    party_re = re.compile(r".*? \((.*)\)")
+    current_parliament = soup.find(id="Current_membership").find_next('ul').find_all('li')
+
+    data = []
+    for x in current_parliament:
+        links = x.find_all('a')
+        party_initialism = party_re.search(x.text).group(1)
+        if len(links) > 1:
+            party = links[1]['title']
+            party_dict[party_initialism] = party
+        else:
+            party = party_dict.get(party_initialism, party_initialism)
+        name = links[0]['title'].split(' (')[0]
+        sort_name = links[0].text
+        family_name, given_name = sort_name.split(', ')
+        wiki_url, wiki_name = get_wiki(links[0])
+        data.append({
+            "name": name,
+            "group": party,
+            "given_name": given_name,
+            "family_name": family_name,
+            "sort_name": sort_name,
+            "wikipedia": wiki_url,
+            "wikipedia_name": wiki_name,
+        })
+
+    scraperwiki.sqlite.save(["name"], data, "data")
+
+r = scraperwiki.scrape(cat_url)
+time.sleep(0.5)
 soup = bs4.BeautifulSoup(r, "html.parser")
 
-current_parliament = soup.find(id="Current_membership").find_next('ul').find_all('li')
-
-party_dict = {}
-data = []
-for x in current_parliament:
-    start_date = ""
-    end_date = ""
-    links = x.find_all('a')
-    party_initialism = party_re.search(x.text).group(1)
-    if party_initialism in party_dict:
-        party = party_dict[party_initialism]
-    else:
-        party = links[1]['title']
-        party_dict[party_initialism] = party
-    name = links[0]['title'].split(' (')[0]
-    sort_name = links[0].text
-    family_name, given_name = sort_name.split(', ')
-    if name == "Albert Isola":
-        # Albert Isola was elected at a by-election on 4 July 2013 after
-        # a seat had become vacant following the death of
-        # Bruzon, Charles Arthur in April 2013.
-        start_date = "2013-07-04"
-    wikipedia_url = None
-    if 'new' not in links[0].get('class', []):
-        wikipedia_url = "{}{}".format(base_url, links[0]['href'])
-    data.append({
-        "name": name,
-        "area": None,
-        "group": party,
-        "term": term,
-        "start_date": start_date,
-        "end_date": end_date,
-        "given_name": given_name,
-        "family_name": family_name,
-        "sort_name": sort_name,
-        "wikipedia": wikipedia_url,
-        "wikipedia_name": name,
-    })
+general_elections = [("{}{}".format(base_url, x['href']), x.text) for x in soup.find_all('a', text=re.compile("general election"))]
+for election_url, election_name in general_elections:
+    r = scraperwiki.scrape(election_url)
+    time.sleep(0.5)
+    soup = bs4.BeautifulSoup(r, "html.parser")
+    if election_name == "Next Gibraltar general election":
+        scrape_latest(soup)
+        continue
+    cell = soup.find('td', text="Name of candidate")
+    if not cell:
+        continue
+    scrape_table(cell.find_parent('table'))
 
 # hardcode data about this deceased politician
 name = "Charles Bruzon"
 sort_name = "Bruzon, Charles Arthur"
 family_name, given_name = sort_name.split(', ')
 death_date = "2013-04-16"
-data.append({
+p = {
     "name": name,
-    "area": None,
     "group": "Gibraltar Socialist Labour Party",
-    "term": term,
-    "start_date": "",
-    "end_date": death_date,
     "death_date": death_date,
     "given_name": given_name,
     "family_name": family_name,
     "sort_name": sort_name,
     "wikipedia": "https://en.wikipedia.org/wiki/Charles_Bruzon",
     "wikipedia_name": name,
-})
-
-
-scraperwiki.sqlite.save(["name", "term"], data, "data")
+}
+scraperwiki.sqlite.save(["name"], p, "data")
