@@ -51,14 +51,16 @@ for x in current_parliament:
         "family_name": family_name,
         "sort_name": sort_name,
         "wikipedia": wikipedia_url,
+        "wikipedia_name": name,
     })
 
 # hardcode data about this deceased politician
+name = "Charles Bruzon"
 sort_name = "Bruzon, Charles Arthur"
 family_name, given_name = sort_name.split(', ')
 death_date = "2013-04-16"
 data.append({
-    "name": "Charles Bruzon",
+    "name": name,
     "area": None,
     "group": "Gibraltar Socialist Labour Party",
     "term": term,
@@ -69,6 +71,7 @@ data.append({
     "family_name": family_name,
     "sort_name": sort_name,
     "wikipedia": "https://en.wikipedia.org/wiki/Charles_Bruzon",
+    "wikipedia_name": name,
 })
 
 
