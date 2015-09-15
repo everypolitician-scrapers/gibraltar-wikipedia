@@ -10,7 +10,6 @@ import scraperwiki
 base_url = "https://en.wikipedia.org"
 cat_url = "{}/wiki/Category:Elections_in_Gibraltar".format(base_url)
 party_dict = {}
-sorted_name_re = re.compile(r"^([A-Z]+), (.*)$")
 
 def get_wiki(wiki_link):
     if wiki_link and 'new' not in wiki_link.get('class', []):
@@ -20,6 +19,16 @@ def get_wiki(wiki_link):
         wiki_url = None
         wiki_name = None
     return wiki_url, wiki_name
+
+def get_names(name):
+    name_list = name.split(', ')
+    if len(name_list) > 1:
+        family_name, given_name = name_list
+        sort_name = name
+        name = "{} {}".format(given_name, family_name)
+    else:
+        family_name, given_name, sort_name = None, None, None
+    return name, family_name, given_name, sort_name
 
 def scrape_table(table_soup):
     data = []
@@ -39,16 +48,11 @@ def scrape_table(table_soup):
         cells = politician.find_all('td')
         if len(cells) == 1:
             break
-        p = cells[mapping["name"]]
-        name = p.text
-        m = sorted_name_re.match(name)
-        if m:
-            family_name, given_name = m.groups()
-            sorted_name = name
-            name = "{} {}".format(given_name, family_name)
-        else:
-            family_name, given_name, sorted_name = None, None, None
-        wiki_url, wiki_name = get_wiki(p.a)
+        name = cells[mapping["name"]].text
+        if not name:
+            break
+        name, family_name, given_name, sort_name = get_names(name)
+        wiki_url, wiki_name = get_wiki(cells[mapping["name"]].a)
         party_short = cells[mapping["party"]].text
         if cells[mapping["party"]].a:
             party = cells[mapping["party"]].a['title']
@@ -59,7 +63,7 @@ def scrape_table(table_soup):
             "name": name,
             "family_name": family_name,
             "given_name": given_name,
-            "sorted_name": sorted_name,
+            "sort_name": sort_name,
             "group": party,
             "wikipedia": wiki_url,
             "wikipedia_name": wiki_name,
@@ -79,9 +83,7 @@ def scrape_latest(soup):
             party_dict[party_initialism] = party
         else:
             party = party_dict.get(party_initialism, party_initialism)
-        name = links[0]['title'].split(' (')[0]
-        sort_name = links[0].text
-        family_name, given_name = sort_name.split(', ')
+        name, family_name, given_name, sort_name = get_names(links[0].text)
         wiki_url, wiki_name = get_wiki(links[0])
         data.append({
             "name": name,
