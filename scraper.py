@@ -1,15 +1,25 @@
 # -*- coding: utf-8 -*-
 from datetime import datetime
+import os
 import re
 import time
 
 import bs4
+import requests
 import scraperwiki
 
 
 base_url = "https://en.wikipedia.org"
 cat_url = "{}/wiki/Category:Elections_in_Gibraltar".format(base_url)
 party_dict = {}
+
+def get_terms_dict():
+    r = requests.get("https://api.morph.io/andylolz/gibraltar-parliament/data.json", params={
+      'key': os.environ.get('MORPH_API_KEY'),
+      'query': "select `id`, `start_date` from `terms`",
+    }, verify=False).json()
+    time.sleep(0.5)
+    return {x['start_date'][:4]: x['id'] for x in r}
 
 def get_wiki(wiki_link):
     if wiki_link and 'new' not in wiki_link.get('class', []):
@@ -35,7 +45,7 @@ def get_names(name):
         family_name, given_name, sort_name = None, None, None
     return name, family_name, given_name, sort_name
 
-def scrape_table(table_soup):
+def scrape_table(table_soup, term):
     data = []
     cols = {
         "party": 0,
@@ -76,10 +86,11 @@ def scrape_table(table_soup):
             "given_name": given_name,
             "sort_name": sort_name,
             "group": party,
+            "term": term,
             "wikipedia": wiki_url,
             "wikipedia_name": wiki_name,
         })
-    scraperwiki.sqlite.save(["name"], data, "data")
+    scraperwiki.sqlite.save(["name", "term"], data, "data")
 
 def scrape_latest(soup):
     party_re = re.compile(r".*? \((.*)\)")
@@ -99,6 +110,7 @@ def scrape_latest(soup):
         data.append({
             "name": name,
             "group": party,
+            "term": max(terms_dict.values()),  # this is v hacky!
             "given_name": given_name,
             "family_name": family_name,
             "sort_name": sort_name,
@@ -106,7 +118,9 @@ def scrape_latest(soup):
             "wikipedia_name": wiki_name,
         })
 
-    scraperwiki.sqlite.save(["name"], data, "data")
+    scraperwiki.sqlite.save(["name", "term"], data, "data")
+
+terms_dict = get_terms_dict()
 
 r = scraperwiki.scrape(cat_url)
 time.sleep(0.5)
@@ -123,22 +137,21 @@ for election_url, election_name in general_elections:
     cell = soup.find('td', text="Name of candidate")
     if not cell:
         continue
-    scrape_table(cell.find_parent('table'))
+    term = terms_dict[election_name[-4:]]
+    scrape_table(cell.find_parent('table'), term)
 
 # hardcode data about this deceased politician
-name = "C A Bruzon"
-wikipedia_name = "Charles Bruzon"
 sort_name = "Bruzon, Charles Arthur"
 family_name, given_name = sort_name.split(', ')
-death_date = "2013-04-16"
 p = {
-    "name": name,
+    "name": "C A Bruzon",
     "group": "Gibraltar Socialist Labour Party",
-    "death_date": death_date,
+    "term": max(terms_dict.values()),  # this is v hacky!
+    "death_date": "2013-04-16",
     "given_name": given_name,
     "family_name": family_name,
     "sort_name": sort_name,
     "wikipedia": "https://en.wikipedia.org/wiki/Charles_Bruzon",
-    "wikipedia_name": wikipedia_name,
+    "wikipedia_name": "Charles Bruzon",
 }
-scraperwiki.sqlite.save(["name"], p, "data")
+scraperwiki.sqlite.save(["name", "term"], p, "data")
