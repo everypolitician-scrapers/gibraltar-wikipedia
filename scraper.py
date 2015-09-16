@@ -58,12 +58,18 @@ def scrape_table(table_soup):
             break
         name, family_name, given_name, sort_name = get_names(name)
         wiki_url, wiki_name = get_wiki(cells[mapping["name"]].a)
-        party_short = cells[mapping["party"]].text
-        if cells[mapping["party"]].a:
-            party = cells[mapping["party"]].a['title']
-            party_dict[party_short] = party
-        else:
-            party = party_dict.get(party_short, party_short)
+
+        # we ignore all but the first party affiliation
+        party_text = cells[mapping["party"]].text.split('/')[0].strip()
+        party = party_dict.get(party_text, party_text)
+        if party == party_text:
+            party_links = cells[mapping["party"]].find_all('a')
+            if party_links:
+                party_link_text = party_links[0].text
+                party = party_dict.get(party_link_text, party_link_text)
+                if party == party_link_text:
+                    party = party_links[0]['title']
+                    party_dict[party_link_text] = party
         data.append({
             "name": name,
             "family_name": family_name,
