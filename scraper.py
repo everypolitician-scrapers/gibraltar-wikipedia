@@ -21,12 +21,17 @@ def get_wiki(wiki_link):
     return wiki_url, wiki_name
 
 def get_names(name):
+    name = name.replace('.', '').title()
     name_list = name.split(', ')
     if len(name_list) > 1:
         family_name, given_name = name_list
+        initials = ' '.join([x[0] for x in given_name.split()])
         sort_name = name
-        name = "{} {}".format(given_name, family_name)
+        name = "{} {}".format(initials, family_name)
     else:
+        name_bits = name.split()
+        initials = ' '.join([x[0] for x in name_bits[:-1]])
+        name = '{} {}'.format(initials, name_bits[-1])
         family_name, given_name, sort_name = None, None, None
     return name, family_name, given_name, sort_name
 
@@ -115,7 +120,8 @@ for election_url, election_name in general_elections:
     scrape_table(cell.find_parent('table'))
 
 # hardcode data about this deceased politician
-name = "Charles Bruzon"
+name = "C A Bruzon"
+wikipedia_name = "Charles Bruzon"
 sort_name = "Bruzon, Charles Arthur"
 family_name, given_name = sort_name.split(', ')
 death_date = "2013-04-16"
@@ -127,6 +133,6 @@ p = {
     "family_name": family_name,
     "sort_name": sort_name,
     "wikipedia": "https://en.wikipedia.org/wiki/Charles_Bruzon",
-    "wikipedia_name": name,
+    "wikipedia_name": wikipedia_name,
 }
 scraperwiki.sqlite.save(["name"], p, "data")
